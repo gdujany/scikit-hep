@@ -14,13 +14,18 @@ Two vector classes are available:
 # -----------------------------------------------------------------------------
 # Import statements
 # -----------------------------------------------------------------------------
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 from skhep.utils.py23 import *
 
 from skhep.utils.exceptions import *
 
-from math import sqrt, atan2, cos, sin, acos, degrees, log, pi, sinh
+#from math import sqrt, atan2, cos, sin, acos, degrees, log, pi, sinh
+from numpy import sqrt, cos, sin, degrees, log, pi, sinh, sign
+from numpy import arccos as acos
+from numpy import arctan2 as atan2
+import numpy as np
+
 
 # -----------------------------------------------------------------------------
 # Vector class in 3D
@@ -110,8 +115,13 @@ class Vector3D(object):
         if not len(values)==3:
             raise ValueError( 'Input iterable length = {0}! Please check your inputs.'.format(len(values)) )
         for i, v in enumerate(values):
-            if not isinstance( v, (int,float) ):
-                raise ValueError( 'Component #{0} is not a number!'.format(i) )
+            try:
+                if not isinstance( v[0], (int,float) ):
+                    raise ValueError( 'Component #{0} is not a number!'.format(i) )
+            except (TypeError, IndexError):
+                if not isinstance( v, (int,float) ):
+                    raise ValueError( 'Component #{0} is not a number!'.format(i) )
+
         return cls(values[0], values[1], values[2])
 
     @property
@@ -156,10 +166,15 @@ class Vector3D(object):
 
     def costheta(self):
         """Return the cosinus of the spherical coordinate theta."""
-        if self.x == 0. and self.y == 0.:
-            return 1.
-        costheta = self.z / self.mag
-        return costheta
+        try:
+            if self.x == 0. and self.y == 0.:
+                return 1.
+            costheta = self.z / self.mag
+            return costheta
+        except ValueError:
+            res = self.z / self.mag
+            res[np.isinf(res)] = 1
+            return res
 
     def theta(self, deg=False):
         """Return the spherical coordinate theta.
@@ -243,10 +258,17 @@ class Vector3D(object):
     def unit(self):
         """Return the normalized vector, i.e. the unit vector along the direction of itself."""
         mag = self.mag
-        if mag > 0. and mag != 1. :
-            return Vector3D.fromiterable([v / mag for v in self.__values])
-        else:
-            return self
+        try:
+            if mag > 0. and mag != 1. :
+                return Vector3D.fromiterable([v / mag for v in self.__values])
+            else:
+                return self
+        except ValueError:
+            new_vals = [v / mag for v in self.__values]
+            for v in self.__values:
+                new_vals[mag<0] = v[mag<0]
+            ret =  Vector3D.fromiterable([v / mag for v in self.__values])
+
 
     def __iadd__(self, other):
         """(self)Addition with another vector, i.e. self+other.
@@ -368,7 +390,11 @@ class Vector3D(object):
         elif not isinstance ( other , Vector3D) :
             return NotImplemented
         ##
-        return isequal ( self[0] , other[0] ) and isequal ( self[1] , other[1] ) and isequal ( self[2] , other[2] )
+        try:
+            return isequal ( self[0] , other[0] ) and isequal ( self[1] , other[1] ) and isequal ( self[2] , other[2] )
+        except ValueError:
+            return numpy.allclose( self[0] , other[0] ) and numpy.allclose( self[1] , other[1] ) and numpy.allclose( self[2] , other[2] )
+            #return isequal ( self[0] , other[0] ).all() and isequal ( self[1] , other[1] ).all() and isequal ( self[2] , other[2] ).all()
 
     def __ne__  (self, other) :
         """Non-equality to another vector.
@@ -420,8 +446,12 @@ class Vector3D(object):
             raise TypeError('Input object not a Vector3D nor an iterable with 3 elements.')
 
         for i, u in enumerate((ux, uy, uz)):
-            if not isinstance( u, (int,float) ):
-                raise ValueError( 'Component #{0} is not a number!'.format(i) )
+            try:
+                if not isinstance( u[0], (int,float) ):
+                    raise ValueError( 'Component #{0} is not a number!'.format(i) )
+            except (TypeError, IndexError):
+                if not isinstance( u, (int,float) ):
+                    raise ValueError( 'Component #{0} is not a number!'.format(i) )
 
         norm = sqrt(ux**2 + uy**2 + uz**2)
         if norm != 1.0:
@@ -790,10 +820,14 @@ class LorentzVector(object):
     @property
     def gamma(self):
         """Return :math:`\\gamma = 1/\\sqrt{1-\\beta^2}`."""
-        if self.beta < 1:
+        try:
+            self.size.x # In case it is np array or similar
             return 1. / sqrt(1. - self.beta**2)
-        else:
-            return 10E10
+        except AttributeError:
+            if self.beta < 1:
+                return 1. / sqrt(1. - self.beta**2)
+            else:
+                return 10E10
 
     @property
     def eta(self):
@@ -822,7 +856,8 @@ class LorentzVector(object):
     def mag(self):
         """Magnitude, a.k.a. norm, of the Lorentz vector."""
         mag2 = self.mag2
-        return sqrt(mag2) if mag2 >= 0. else -sqrt(-mag2)
+        return sign(mag2)*sqrt(abs(mag2))
+        #return sqrt(mag2) if mag2 >= 0. else -sqrt(-mag2)
 
     @property
     def mag2(self):
@@ -997,16 +1032,26 @@ class LorentzVector(object):
             raise TypeError('Input object not a Vector3D nor an iterable with 3 elements.')
 
         for i, b in enumerate((bx, by, bz)):
-            if not isinstance( b, (int,float) ):
-                raise ValueError( 'Component #{0} is not a number!'.format(i) )
+            try:
+                if not isinstance( b[0], (int,float) ):
+                    raise ValueError( 'Component #{0} is not a number!'.format(i) )
+            except (TypeError, IndexError):
+                if not isinstance( b, (int,float) ):
+                    raise ValueError( 'Component #{0} is not a number!'.format(i) )
+
 
         b2 = bx**2 + by**2 + bz**2
         gamma = 1. / sqrt( 1. - b2 )
         bp = bx * self.x + by * self.y + bz * self.z
-        if b2 > 0.:
-            gamma2 = ( gamma - 1. ) / b2
+
+        if isinstance( b2, (int,float) ):
+            if b2 > 0.:
+                gamma2 = ( gamma - 1. ) / b2
+            else:
+                gamma2 = 0.
         else:
-            gamma2 = 0.
+            gamma2 = ( gamma - 1. ) / b2
+            gamma2[b2<0.] = 0
 
         xp = self.x + gamma2 * bp * bx - gamma * bx * self.t
         yp = self.y + gamma2 * bp * by - gamma * by * self.t

@@ -89,7 +89,16 @@ def isclose ( a  , b , ulps = 1000 ) :
     >>> b = ...
     >>> print isclose ( a , b , 1000 )
     """
-    return ( a == b ) or ulps >= abs ( distance ( a , b ) )
+    try:
+        return ( a == b ) or ulps >= abs ( distance ( a , b ) )
+    except ValueError:
+        import numpy as np
+        try:
+            np.testing.assert_array_almost_equal_nulp(a,b, ulps)
+            are_close = True
+        except AssertionError:
+            are_close = False
+        return ( a == b ).all() or are_close
 
 
 def isequal ( a , b , scale = 1.0 , absdiff = 0.0 , ulps = 1000 ) :
@@ -109,4 +118,7 @@ def isequal ( a , b , scale = 1.0 , absdiff = 0.0 , ulps = 1000 ) :
     >>> isequal(1,1+sys.float_info.epsilon, scale = 100 , ulps = 0 )
     True
     """
-    return ( a == b ) or ( 0 < absdiff and abs ( a - b ) < absdiff ) or isclose ( a , b , ulps ) or ( scale and isclose ( ( a - b ) + scale , scale , ulps ) )
+    try:
+        return ( a == b ) or ( 0 < absdiff and abs ( a - b ) < absdiff ) or isclose ( a , b , ulps ) or ( scale and isclose ( ( a - b ) + scale , scale , ulps ) )
+    except ValueError:
+        return ( a == b ).all() or ( 0 < absdiff and (abs ( a - b ) < absdiff).all() ) or isclose ( a , b , ulps ) or ( scale and isclose ( ( a - b ) + scale , scale , ulps ) )

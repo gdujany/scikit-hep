@@ -14,13 +14,15 @@ from skhep.math.vectors import *
 from skhep.utils.py23 import *
 from skhep.utils.exceptions import *
 from math import pi, sqrt
+import numpy as np
 
 
 # -----------------------------------------------------------------------------
 # Actual tests
 # -----------------------------------------------------------------------------
 def test_vectors_constructors():
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError
+):
         Vector3D.fromiterable(1.)
     with pytest.raises(ValueError):
         Vector3D.fromiterable([1.])
@@ -52,6 +54,23 @@ def test_vectors_constructors():
     assert v9 == Vector3D(sqrt(2), sqrt(2), 0.)
     v10 = Vector3D.frompoint( 2., 2., 2.)
     assert str(v10) == str((2., 2., 2.))
+    #
+    # Test with numpy arrays as input
+    v11 = Vector3D(np.array([0.,1.]),np.array([0.,1.]),np.array([0.,1.]))
+    assert str(v11) == str((np.array([0.,1.]),np.array([0.,1.]),np.array([0.,1.])))
+    v12 = Vector3D.fromvector(v11)
+    assert str(v11) == str((np.array([0.,1.]),np.array([0.,1.]),np.array([0.,1.])))
+    v13 = Vector3D.fromcylindricalcoords(np.array([1.,1.]), np.array([0.,0.]), np.array([1.,1.]))
+    assert v13 == Vector3D(np.array([1.,1.]), np.array([0.,0.]), np.array([1.,1.]))
+    assert (v5.rho == np.array([1.,1.])).all()
+    v14 = Vector3D.fromcylindricalcoords(np.array([0.5,0.5]), np.array([pi/2,pi/2]), np.array([0.,0.]))
+    assert v14 == Vector3D(np.array([0.,0.]), np.array([0.5,0.5]), np.array([0.,0]))
+    v15 = Vector3D.fromsphericalcoords(np.array([1.0,2.0]), np.array([0.,pi/2]), np.array([0.,pi/4]))
+    assert v15 == Vector3D(np.array([0.,sqrt(2)]), np.array([0.,sqrt(2)]), np.array([1.,0.]))
+    assert (v15.r == np.array([1.,2.])).all()
+    assert (v15.theta() == np.array([0.,pi/2])).all()
+    v16 = Vector3D.frompoint(np.array([1.,2.]), np.array([1.,2.]), np.array([1.,2.]))
+    assert str(v16) == str((np.array([1.,2.]), np.array([1.,2.]), np.array([1.,2.])))
     #
     with pytest.raises(TypeError):
         LorentzVector.fromiterable(1)
